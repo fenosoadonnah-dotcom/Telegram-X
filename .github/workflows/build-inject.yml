@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code (fork Android-ready)
+      - name: Checkout fork Android-ready
         uses: actions/checkout@v4
         with:
-          repository: YOUR_USERNAME/YOUR_TELEGRAM_X_FORK
+          repository: Andriantsoa/Telegram-X-Android
           ref: main
 
       - name: Set up JDK 17
@@ -49,8 +49,8 @@ jobs:
       - name: Clean old TDLib folder
         run: rm -rf tdlib
 
-      - name: Clone TDLib (Android-ready fork)
-        run: git clone --depth=1 https://github.com/YOUR_USERNAME/tdlib-android tdlib
+      - name: Clone TDLib (Android-ready)
+        run: git clone --depth=1 https://github.com/Andriantsoa/tdlib-android tdlib
 
       - name: Download & build OpenSSL for Android
         run: |
