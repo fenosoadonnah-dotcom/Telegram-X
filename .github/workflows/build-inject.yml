@@ -1,7 +1,7 @@
 name: Build Telegram X
 
 on:
-  workflow_dispatch: # exécution manuelle
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -27,27 +27,16 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Generate local.properties
+      - name: Generate local.properties with Telegram credentials
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           echo "ndk.dir=$ANDROID_NDK_HOME" >> local.properties
+          echo "telegram.api_id=${APP_ID}" >> local.properties
+          echo "telegram.api_hash=${APP_HASH}" >> local.properties
           cat local.properties
-
-      - name: Inject APP_ID and APP_HASH
-        run: |
-          FILE=$(grep -R "class BuildVars" -n . | cut -d: -f1 | head -n1 || true)
-          if [ -n "$FILE" ]; then
-            echo "Using BuildVars file: $FILE"
-            sed -i "s/public static final int APP_ID = .*/public static final int APP_ID = ${APP_ID};/" $FILE || true
-            sed -i "s/public static final String APP_HASH = .*/public static final String APP_HASH = \"${APP_HASH}\";/" $FILE || true
-          else
-            echo "⚠️ Aucun BuildVars.java trouvé, fallback via build.gradle"
-            candidate=$(find . -maxdepth 3 -type f -name "build.gradle.kts" | grep "app/build.gradle.kts" || true)
-            if [ -n "$candidate" ]; then
-              echo "Patching $candidate"
-              perl -0777 -pe 's/(defaultConfig\s*\{)/$1\n        buildConfigField "int", "APP_ID", "${ENV{APP_ID}}"\n        buildConfigField "String", "APP_HASH", "\"${ENV{APP_HASH}}\""\n/s' -i $candidate
-            fi
-          fi
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_HASH: ${{ secrets.APP_HASH }}
 
       - name: Build release APK(s)
         run: ./gradlew assembleRelease --no-daemon
