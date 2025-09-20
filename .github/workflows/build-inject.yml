@@ -1,4 +1,4 @@
-name: Build Telegram X
+name: Build Telegram X Multi-ABI
 
 on:
   workflow_dispatch:
@@ -13,6 +13,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [armeabi-v7a, arm64-v8a, x86_64]
 
     steps:
       - name: Checkout code
@@ -38,32 +41,54 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_HASH: ${{ secrets.APP_HASH }}
 
-      - name: Install TDLib dependencies
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config gperf zlib1g-dev libssl-dev
+          sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl
 
-      - name: Build TDLib (OpenSSL & zlib)
+      - name: Download & build OpenSSL for Android (${{ matrix.abi }})
+        run: |
+          mkdir -p tdlib/source/openssl
+          cd tdlib/source/openssl
+          wget https://www.openssl.org/source/openssl-1.1.1u.tar.gz
+          tar xvf openssl-1.1.1u.tar.gz
+          cd openssl-1.1.1u
+          export ANDROID_NDK=$ANDROID_NDK_HOME
+          export PATH=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          if [ "${{ matrix.abi }}" = "armeabi-v7a" ]; then
+            ./Configure android-arm -D__ANDROID_API__=24 no-shared no-unit-test
+          elif [ "${{ matrix.abi }}" = "arm64-v8a" ]; then
+            ./Configure android-arm64 -D__ANDROID_API__=24 no-shared no-unit-test
+          elif [ "${{ matrix.abi }}" = "x86_64" ]; then
+            ./Configure android-x86_64 -D__ANDROID_API__=24 no-shared no-unit-test
+          fi
+          make -j$(nproc)
+          cd ../../..
+
+      - name: Build TDLib for Android (${{ matrix.abi }})
         run: |
           git clone --depth=1 https://github.com/tdlib/td.git tdlib
           cd tdlib
           mkdir build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=../install ..
+          cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+                -DANDROID_ABI=${{ matrix.abi }} \
+                -DANDROID_PLATFORM=android-24 \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DOPENSSL_ROOT_DIR=$GITHUB_WORKSPACE/tdlib/source/openssl/openssl-1.1.1u \
+                -DCMAKE_INSTALL_PREFIX:PATH=../install ..
           cmake --build . --target install -j$(nproc)
           cd ../..
-
-          # copier includes et libs vers le projet Android
           mkdir -p app/tdlib/source
           cp -r tdlib/install/include app/tdlib/source/
           cp -r tdlib/install/lib app/tdlib/source/
 
-      - name: Build release APK(s)
+      - name: Build release APK(s) (${{ matrix.abi }})
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Upload APK artifacts
+      - name: Upload APK artifacts (${{ matrix.abi }})
         uses: actions/upload-artifact@v4
         with:
-          name: telegram-x-apks
+          name: telegram-x-apks-${{ matrix.abi }}
           path: '**/build/outputs/apk/**/*.apk'
           compression-level: 6
           overwrite: true
