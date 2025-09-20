@@ -1,4 +1,4 @@
-name: Build Telegram X Multi-ABI Optimized
+name: Build Telegram X Multi-ABI (Android-ready fork)
 
 on:
   workflow_dispatch:
@@ -15,8 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout code (fork Android-ready)
         uses: actions/checkout@v4
+        with:
+          repository: YOUR_USERNAME/YOUR_TELEGRAM_X_FORK
+          ref: main
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -46,8 +49,8 @@ jobs:
       - name: Clean old TDLib folder
         run: rm -rf tdlib
 
-      - name: Clone TDLib
-        run: git clone --depth=1 https://github.com/tdlib/td.git tdlib
+      - name: Clone TDLib (Android-ready fork)
+        run: git clone --depth=1 https://github.com/YOUR_USERNAME/tdlib-android tdlib
 
       - name: Download & build OpenSSL for Android
         run: |
@@ -58,7 +61,7 @@ jobs:
           cd openssl-1.1.1u
           export ANDROID_NDK=$ANDROID_NDK_HOME
           export PATH=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-          # On compile armeabi-v7a par défaut pour TDLib Android
+          # Compile armeabi-v7a par défaut
           ./Configure android-arm -D__ANDROID_API__=24 no-shared no-unit-test
           make -j$(nproc)
           cd ../../..
