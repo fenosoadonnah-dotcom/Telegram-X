@@ -41,20 +41,13 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl python3 zlib1g-dev libssl-dev
+          sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl zlib1g-dev libssl-dev
 
       - name: Clean old TDLib folder
         run: rm -rf tdlib
 
       - name: Clone TDLib
         run: git clone --depth=1 https://github.com/tdlib/td.git tdlib
-
-      - name: Generate TDLib auto files
-        run: |
-          cd tdlib
-          mkdir -p tdutils/generate/auto
-          python3 tdutils/generate/mime_type_to_extension.py > tdutils/generate/auto/mime_type_to_extension.cpp
-          cd ..
 
       - name: Download & build OpenSSL for Android
         run: |
@@ -65,7 +58,7 @@ jobs:
           cd openssl-1.1.1u
           export ANDROID_NDK=$ANDROID_NDK_HOME
           export PATH=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-          # On compile pour armeabi-v7a par défaut pour TDLib Android (les autres ABI seront supportés via Gradle)
+          # On compile armeabi-v7a par défaut pour TDLib Android
           ./Configure android-arm -D__ANDROID_API__=24 no-shared no-unit-test
           make -j$(nproc)
           cd ../../..
