@@ -18,7 +18,7 @@ jobs:
       - name: Checkout fork Android-ready
         uses: actions/checkout@v4
         with:
-          repository: TON_USERNAME/TON_FORK
+          repository: fenosoadonnah-dotcom/Telegram-X
           ref: main
 
       - name: Set up JDK 17
