@@ -1,0 +1,101 @@
+name: Build Telegram X (inject APP_ID / APP_HASH)
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_ID: ${{ secrets.APP_ID }}
+  APP_HASH: ${{ secrets.APP_HASH }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Find candidate files (APP_ID / APP_HASH)
+        id: find
+        run: |
+          set -euo pipefail
+          echo "Searching for APP_ID / APP_HASH / api_id / api_hash ..."
+          matches=$(grep -R --line-number --binary-files=without-match -E "APP_ID|APP_HASH|api_id|api_hash|apiId|app_id|app_hash|API_ID|API_HASH|appHash" . || true)
+          echo "=== MATCHES ==="
+          echo "$matches"
+          # expose matches to next steps
+          echo "::set-output name=matches::${matches}"
+
+      - name: Patch found files (replace constants / keys)
+        if: steps.find.outputs.matches != ''
+        run: |
+          set -euo pipefail
+          echo "Patching files that contain APP_ID / APP_HASH ..."
+          printf "%s\n" "${{ steps.find.outputs.matches }}" > /tmp/matches.txt
+          # unique file list, only common editable extensions
+          files=$(cut -d: -f1 /tmp/matches.txt | sort -u | grep -E "\.(java|kt|kts|xml|gradle|properties|txt)$" || true)
+          echo "Files to patch: $files"
+          for f in $files; do
+            echo "-> Patching $f"
+            # java style: public static final int APP_ID = 6;
+            sed -E -i "s/(public static final (int|long)[[:space:]]+APP_ID[[:space:]]*=[[:space:]]*)[0-9]+;/\1${APP_ID};/g" "$f" || true
+            sed -E -i "s/(public static final String[[:space:]]+APP_HASH[[:space:]]*=[[:space:]]*\")[^\"]*(\";)/\1${APP_HASH}\2/g" "$f" || true
+            # properties style: APP_ID=12345
+            sed -E -i "s/(^APP_ID[[:space:]]*=[[:space:]]*)[0-9]+/\1${APP_ID}/g" "$f" || true
+            sed -E -i "s/(^APP_HASH[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1${APP_HASH}\2/g" "$f" || true
+            # xml strings: <string name="app_id">123</string>
+            sed -E -i "s|(<string[[:space:]]+name=\"app_id\">)[0-9]+(</string>)|\1${APP_ID}\2|g" "$f" || true
+            sed -E -i "s|(<string[[:space:]]+name=\"app_hash\">)[^<]+(</string>)|\1${APP_HASH}\2|g" "$f" || true
+          done
+          git add -A || true
+          git commit -m "CI: inject APP_ID / APP_HASH" || echo "no changes to commit"
+
+      - name: Fallback — inject buildConfigField in module build.gradle
+        if: steps.find.outputs.matches == ''
+        run: |
+          set -euo pipefail
+          echo "No APP_ID/APP_HASH constants found. Attempting fallback: insert buildConfigField into a module build.gradle"
+          # try common module directories first
+          candidate=$(find . -maxdepth 3 -type f -name "build.gradle" | grep -E "(app|TMessagesProj|telegram|module)" | head -n1 || true)
+          candidate=${candidate:-$(find . -maxdepth 4 -type f -name "build.gradle" | head -n1)}
+          if [ -z "$candidate" ]; then
+            echo "No build.gradle found in repository root subtree (maxdepth 4). Aborting fallback."
+            exit 0
+          fi
+          echo "Using build.gradle: $candidate"
+          # if buildConfigField already present, skip
+          if grep -q "buildConfigField .*APP_ID" "$candidate"; then
+            echo "buildConfigField APP_ID already present in $candidate"
+          else
+            # insert two lines right after defaultConfig { ... (first occurrence)
+            # Using perl to handle multi-line insertion safely and expand env variables
+            perl -0777 -pe 's/(defaultConfig\s*\{)/$1\n        buildConfigField "int", "APP_ID", "${ENV{APP_ID}}"\n        buildConfigField "String", "APP_HASH", "\"${ENV{APP_HASH}}\""\n/s' -i "$candidate"
+            echo "Inserted buildConfigField APP_ID/APP_HASH into $candidate"
+            git add "$candidate"
+            git commit -m "CI: add buildConfigField APP_ID/APP_HASH to $candidate" || echo "no changes to commit"
+          fi
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build release APK(s)
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: telegram-x-apks
+          path: '**/build/outputs/apk/**/*.apk'
