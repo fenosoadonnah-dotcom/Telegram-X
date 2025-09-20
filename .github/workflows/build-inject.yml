@@ -18,7 +18,7 @@ jobs:
       - name: Checkout fork Android-ready
         uses: actions/checkout@v4
         with:
-          repository: Andriantsoa/Telegram-X-Android
+          repository: fenosoadonnah-dotcom/Telegram-X
           ref: main
 
       - name: Set up JDK 17
@@ -50,7 +50,7 @@ jobs:
         run: rm -rf tdlib
 
       - name: Clone TDLib (Android-ready)
-        run: git clone --depth=1 https://github.com/Andriantsoa/tdlib-android tdlib
+        run: git clone --depth=1 https://github.com/fenosoadonnah-dotcom//tdlib-android tdlib
 
       - name: Download & build OpenSSL for Android
         run: |
@@ -61,7 +61,6 @@ jobs:
           cd openssl-1.1.1u
           export ANDROID_NDK=$ANDROID_NDK_HOME
           export PATH=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-          # Compile armeabi-v7a par défaut
           ./Configure android-arm -D__ANDROID_API__=24 no-shared no-unit-test
           make -j$(nproc)
           cd ../../..
