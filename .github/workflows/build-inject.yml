@@ -38,6 +38,25 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_HASH: ${{ secrets.APP_HASH }}
 
+      - name: Install TDLib dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config gperf zlib1g-dev libssl-dev
+
+      - name: Build TDLib (OpenSSL & zlib)
+        run: |
+          git clone --depth=1 https://github.com/tdlib/td.git tdlib
+          cd tdlib
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=../install ..
+          cmake --build . --target install -j$(nproc)
+          cd ../..
+
+          # copier includes et libs vers le projet Android
+          mkdir -p app/tdlib/source
+          cp -r tdlib/install/include app/tdlib/source/
+          cp -r tdlib/install/lib app/tdlib/source/
+
       - name: Build release APK(s)
         run: ./gradlew assembleRelease --no-daemon
 
