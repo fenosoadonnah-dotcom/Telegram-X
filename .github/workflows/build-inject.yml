@@ -1,4 +1,4 @@
-name: Build Telegram X Multi-ABI (Android-ready fork)
+name: Build Telegram X Multi-ABI (Official Repo)
 
 on:
   workflow_dispatch:
@@ -15,11 +15,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout fork Android-ready
+      - name: Checkout official Telegram X repo
         uses: actions/checkout@v4
-        with:
-          repository: fenosoadonnah-dotcom/Telegram-X
-          ref: main
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -45,12 +42,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl zlib1g-dev libssl-dev
-
-      - name: Clean old TDLib folder
-        run: rm -rf tdlib
-
-      - name: Clone TDLib (Android-ready)
-        run: git clone --depth=1 https://github.com/fenosoadonnah-dotcom//tdlib-android tdlib
 
       - name: Download & build OpenSSL for Android
         run: |
