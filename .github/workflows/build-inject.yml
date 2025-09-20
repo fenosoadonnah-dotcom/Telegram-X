@@ -1,4 +1,4 @@
-name: Build Telegram X Multi-ABI (Official Repo)
+name: Build Telegram X Multi-ABI (with official TDLib)
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout official Telegram X repo
+      - name: Checkout Telegram X official repo
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -38,15 +38,18 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_HASH: ${{ secrets.APP_HASH }}
 
-      - name: Install build tools
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl zlib1g-dev libssl-dev
+          sudo apt-get install -y cmake ninja-build pkg-config gperf wget unzip perl zlib1g-dev libssl-dev build-essential
+
+      - name: Clone TDLib official repo
+        run: git clone --depth=1 https://github.com/tdlib/td tdlib
 
       - name: Download & build OpenSSL for Android
         run: |
-          mkdir -p tdlib/source/openssl
-          cd tdlib/source/openssl
+          mkdir -p tdlib/openssl
+          cd tdlib/openssl
           wget https://www.openssl.org/source/openssl-1.1.1u.tar.gz
           tar xvf openssl-1.1.1u.tar.gz
           cd openssl-1.1.1u
@@ -54,9 +57,9 @@ jobs:
           export PATH=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
           ./Configure android-arm -D__ANDROID_API__=24 no-shared no-unit-test
           make -j$(nproc)
-          cd ../../..
+          cd ../../../
 
-      - name: Build TDLib for Android (once)
+      - name: Build TDLib for Android
         run: |
           cd tdlib
           mkdir -p build && cd build
@@ -64,7 +67,7 @@ jobs:
                 -DANDROID_ABI=armeabi-v7a \
                 -DANDROID_PLATFORM=android-24 \
                 -DCMAKE_BUILD_TYPE=Release \
-                -DOPENSSL_ROOT_DIR=$GITHUB_WORKSPACE/tdlib/source/openssl/openssl-1.1.1u \
+                -DOPENSSL_ROOT_DIR=$GITHUB_WORKSPACE/tdlib/openssl/openssl-1.1.1u \
                 -DCMAKE_INSTALL_PREFIX:PATH=../install ..
           cmake --build . --target install -j$(nproc)
           cd ../..
